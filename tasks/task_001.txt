@@ -1,0 +1,50 @@
+# Task ID: 1
+# Title: Setup iOS Project with SwiftUI and Core Architecture
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Initialize the iOS project with SwiftUI, implement MVVM architecture, and set up the basic project structure including data models and local storage with SwiftData.
+# Details:
+1. Create a new iOS project using SwiftUI
+2. Set up MVVM architecture with folders for Models, Views, ViewModels
+3. Implement core data models:
+   - SermonRecording (id, title, audioURL, serviceType, date, duration)
+   - Note (id, content, timestamp, sermonId)
+   - Transcription (id, content, sermonId)
+   - UserProfile (id, email, tier, usage)
+   - ServiceType (enum: Sunday, BibleStudy, Midweek, Conference, GuestSpeaker)
+4. Configure SwiftData for local storage
+5. Set up basic navigation structure with TabView
+6. Implement offline-first approach with local caching
+7. Create reusable UI components
+
+Code example for SermonRecording model:
+```swift
+@Model
+class SermonRecording {
+    var id: UUID
+    var title: String
+    var audioURL: URL?
+    var serviceType: ServiceType
+    var date: Date
+    var duration: TimeInterval
+    var notes: [Note]?
+    var transcription: Transcription?
+    
+    init(id: UUID = UUID(), title: String, serviceType: ServiceType, date: Date = Date()) {
+        self.id = id
+        self.title = title
+        self.serviceType = serviceType
+        self.date = date
+        self.duration = 0
+    }
+}
+```
+
+# Test Strategy:
+1. Unit tests for all data models to ensure proper initialization and relationships
+2. UI tests for basic navigation flow
+3. Test offline capabilities by toggling network connection
+4. Verify SwiftData persistence by creating and retrieving objects
+5. Test app performance metrics including launch time (target: under 2 seconds)
+6. Verify proper MVVM separation by testing ViewModels independently

@@ -1,0 +1,135 @@
+# Task ID: 4
+# Title: Integrate AssemblyAI for Transcription and Summarization
+# Status: pending
+# Dependencies: 2, 3
+# Priority: medium
+# Description: Implement the AI transcription and summarization features using AssemblyAI's asynchronous API, with different summary depths based on user tier.
+# Details:
+1. Create AssemblyAIService class to handle API interactions
+2. Implement audio upload functionality to AssemblyAI
+3. Create polling mechanism for asynchronous transcription status
+4. Implement summary generation with tier-based depth:
+   - Free tier: High-level summary
+   - Paid tier: Deep summary + insights + preaching tone
+5. Store and display transcription and summary results
+6. Implement error handling and retry logic
+7. Add offline queueing for uploads when internet becomes available
+
+Code example for AssemblyAIService:
+```swift
+class AssemblyAIService {
+    private let apiKey = "YOUR_ASSEMBLY_AI_KEY" // Store securely
+    private let baseURL = "https://api.assemblyai.com/v2"
+    
+    func uploadAudio(fileURL: URL) async throws -> String {
+        let uploadURL = URL(string: "\(baseURL)/upload")
+        
+        var request = URLRequest(url: uploadURL!)
+        request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "authorization")
+        
+        let data = try Data(contentsOf: fileURL)
+        
+        let (responseData, response) = try await URLSession.shared.upload(for: request, from: data)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NSError(domain: "AssemblyAIError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Upload failed"])
+        }
+        
+        let uploadResponse = try JSONDecoder().decode(UploadResponse.self, from: responseData)
+        return uploadResponse.uploadUrl
+    }
+    
+    func transcribeAudio(audioURL: String, isPaidUser: Bool) async throws -> String {
+        let transcriptionURL = URL(string: "\(baseURL)/transcript")
+        
+        var request = URLRequest(url: transcriptionURL!)
+        request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "authorization")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        
+        // Configure different summarization based on user tier
+        let summaryType = isPaidUser ? "detailed" : "headline"
+        
+        let requestBody: [String: Any] = [
+            "audio_url": audioURL,
+            "auto_chapters": true,
+            "summarization": true,
+            "summary_type": summaryType,
+            "summary_model": "conversational"
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NSError(domain: "AssemblyAIError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Transcription request failed"])
+        }
+        
+        let transcriptionResponse = try JSONDecoder().decode(TranscriptionResponse.self, from: responseData)
+        return transcriptionResponse.id
+    }
+    
+    func getTranscriptionResult(id: String) async throws -> TranscriptionResult {
+        let resultURL = URL(string: "\(baseURL)/transcript/\(id)")
+        
+        var request = URLRequest(url: resultURL!)
+        request.setValue(apiKey, forHTTPHeaderField: "authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NSError(domain: "AssemblyAIError", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to get transcription"])
+        }
+        
+        return try JSONDecoder().decode(TranscriptionResult.self, from: data)
+    }
+    
+    func pollForTranscriptionCompletion(id: String) async throws -> TranscriptionResult {
+        var result = try await getTranscriptionResult(id: id)
+        
+        while result.status != "completed" && result.status != "error" {
+            try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            result = try await getTranscriptionResult(id: id)
+        }
+        
+        if result.status == "error" {
+            throw NSError(domain: "AssemblyAIError", code: 4, userInfo: [NSLocalizedDescriptionKey: result.error ?? "Unknown error"])
+        }
+        
+        return result
+    }
+}
+
+struct UploadResponse: Decodable {
+    let uploadUrl: String
+}
+
+struct TranscriptionResponse: Decodable {
+    let id: String
+}
+
+struct TranscriptionResult: Decodable {
+    let id: String
+    let status: String
+    let text: String?
+    let summary: String?
+    let chapters: [Chapter]?
+    let error: String?
+}
+
+struct Chapter: Decodable {
+    let headline: String
+    let summary: String
+    let start: Int
+    let end: Int
+}
+```
+
+# Test Strategy:
+1. Test API integration with mock responses
+2. Verify different summary depths based on user tier
+3. Test polling mechanism with various response scenarios
+4. Verify error handling and retry logic
+5. Test offline queueing and subsequent upload
+6. Measure performance with large audio files
+7. Test transcription accuracy with various sermon styles
+8. Verify proper storage and display of transcription results

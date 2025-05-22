@@ -1,0 +1,111 @@
+# Task ID: 3
+# Title: Develop Real-time Note-taking Interface
+# Status: pending
+# Dependencies: 2
+# Priority: high
+# Description: Create the split-screen note-taking interface that allows users to type notes while recording is in progress, with continuous auto-save functionality.
+# Details:
+1. Design split-screen UI with recording status at top and note-taking area below
+2. Implement TextEditor with styling for note input
+3. Create auto-save functionality that persists notes as user types
+4. Implement note association with current recording session
+5. Add keyboard handling and text formatting options
+6. Create NotesViewModel to manage note state and persistence
+7. Implement offline support for notes
+
+Code example for NotesView:
+```swift
+struct NotesView: View {
+    @ObservedObject var viewModel: NotesViewModel
+    @EnvironmentObject var recordingManager: RecordingManager
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Recording status header
+            if recordingManager.isRecording {
+                RecordingStatusView(duration: viewModel.elapsedTime)
+                    .frame(height: 60)
+                    .background(Color.red.opacity(0.1))
+            }
+            
+            // Note taking area
+            TextEditor(text: $viewModel.noteText)
+                .padding()
+                .onChange(of: viewModel.noteText) { newValue in
+                    viewModel.saveNote()
+                }
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        // Text formatting buttons
+                        Button(action: { viewModel.formatBold() }) {
+                            Image(systemName: "bold")
+                        }
+                        Button(action: { viewModel.formatItalic() }) {
+                            Image(systemName: "italic")
+                        }
+                        Spacer()
+                    }
+                }
+        }
+        .onAppear {
+            viewModel.loadExistingNotes(for: recordingManager.currentRecording)
+        }
+    }
+}
+
+class NotesViewModel: ObservableObject {
+    @Published var noteText = ""
+    @Published var elapsedTime: TimeInterval = 0
+    private var timer: Timer?
+    private var currentRecording: SermonRecording?
+    private var modelContext: ModelContext
+    
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+        startTimer()
+    }
+    
+    func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.elapsedTime += 1.0
+        }
+    }
+    
+    func loadExistingNotes(for recording: SermonRecording?) {
+        guard let recording = recording else { return }
+        self.currentRecording = recording
+        
+        if let existingNote = recording.notes?.first {
+            self.noteText = existingNote.content
+        }
+    }
+    
+    func saveNote() {
+        guard let recording = currentRecording else { return }
+        
+        // Debounce save operation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            
+            if let existingNote = recording.notes?.first {
+                existingNote.content = self.noteText
+            } else {
+                let newNote = Note(content: self.noteText, sermonId: recording.id)
+                recording.notes = [newNote]
+            }
+            
+            try? self.modelContext.save()
+        }
+    }
+}
+```
+
+# Test Strategy:
+1. Test auto-save functionality with timed intervals
+2. Verify note persistence across app restarts
+3. Test keyboard handling and text formatting
+4. Verify split-screen UI adapts to different device sizes
+5. Test performance with large notes (10,000+ characters)
+6. Verify offline note-taking works correctly
+7. Test note association with the correct recording
+8. Verify UI responsiveness during continuous typing

@@ -1,0 +1,125 @@
+# Task ID: 2
+# Title: Implement Audio Recording and Service Type Selection
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Create the audio recording functionality with AVFoundation, implement the record button UI, service type selection modal, and recording status indicators.
+# Details:
+1. Implement AVFoundation integration for audio recording
+2. Configure audio settings: AAC format, 128kbps, 44.1kHz
+3. Create RecordingManager class to handle recording state and file management
+4. Design and implement the central record button in tab bar
+5. Create service type selection modal that appears after tapping record
+6. Implement visual recording indicators (animated waveform or timer)
+7. Handle permissions for microphone access
+8. Implement offline recording capability with local storage
+9. Add higher quality recording option (256kbps) for paid tier users
+
+Code example for RecordingManager:
+```swift
+class RecordingManager: ObservableObject {
+    @Published var isRecording = false
+    @Published var currentRecording: SermonRecording?
+    private var audioRecorder: AVAudioRecorder?
+    
+    func startRecording(serviceType: ServiceType) {
+        let audioSession = AVAudioSession.sharedInstance()
+        
+        do {
+            try audioSession.setCategory(.playAndRecord, mode: .default)
+            try audioSession.setActive(true)
+            
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let audioFilename = documentsPath.appendingPathComponent("\(UUID().uuidString).m4a")
+            
+            let settings = [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 44100.0,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderBitRateKey: 128000
+            ] as [String: Any]
+            
+            audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+            audioRecorder?.record()
+            
+            isRecording = true
+            currentRecording = SermonRecording(title: "New Recording", serviceType: serviceType)
+            currentRecording?.audioURL = audioFilename
+        } catch {
+            print("Recording failed: \(error)")
+        }
+    }
+    
+    func stopRecording() {
+        audioRecorder?.stop()
+        isRecording = false
+        // Save recording to SwiftData
+    }
+}
+```
+
+# Test Strategy:
+1. Test microphone permission handling
+2. Verify audio recording quality and format
+3. Test service type selection modal UI and functionality
+4. Verify recording indicators update correctly
+5. Test offline recording and subsequent upload
+6. Measure battery impact during extended recording sessions
+7. Verify different quality settings for free vs paid users
+8. Test error handling for recording failures
+
+# Subtasks:
+## 1. Create RecordingManager Class with AVFoundation Integration [done]
+### Dependencies: None
+### Description: Implement the RecordingManager class that will handle audio recording functionality using AVFoundation, including the core methods for starting and stopping recordings.
+### Details:
+1. Create a new RecordingManager class as an ObservableObject
+2. Add properties for tracking recording state and current recording
+3. Implement AVAudioRecorder integration
+4. Create methods for starting recording with proper audio settings (AAC format, 128kbps, 44.1kHz)
+5. Implement stopRecording method
+6. Add error handling for recording failures
+
+## 2. Implement Microphone Permission Handling [done]
+### Dependencies: 2.1
+### Description: Add functionality to request and handle microphone access permissions, ensuring the app properly requests access before attempting to record.
+### Details:
+1. Update Info.plist with microphone usage description
+2. Create a PermissionManager class or extend RecordingManager to check microphone permission status
+3. Implement method to request microphone permissions
+4. Add proper error handling and user feedback for denied permissions
+5. Ensure recording only starts after permissions are granted
+
+## 3. Design and Implement Record Button in Tab Bar [done]
+### Dependencies: 2.1, 2.2
+### Description: Create the UI for the central record button in the tab bar that will trigger the recording flow.
+### Details:
+1. Design a circular record button with appropriate styling
+2. Position the button in the center of the tab bar
+3. Add tap gesture recognition
+4. Implement visual feedback for button press
+5. Connect button tap to show the service type selection modal
+6. Update button appearance based on recording state (normal vs. recording)
+
+## 4. Create Service Type Selection Modal [done]
+### Dependencies: 2.3
+### Description: Implement the modal dialog that appears after tapping the record button, allowing users to select the type of service they are recording.
+### Details:
+1. Create a new SwiftUI view for the service type selection modal
+2. Design a list or grid of service type options (Sunday Service, Bible Study, etc.)
+3. Implement selection behavior with visual feedback
+4. Add a confirmation button to start recording
+5. Connect selection to the RecordingManager to start recording with the selected service type
+6. Include option to cancel without starting recording
+
+## 5. Implement Recording Status Indicators [done]
+### Dependencies: 2.1, 2.4
+### Description: Add visual indicators to show recording status, including an animated waveform or timer to provide feedback during active recording.
+### Details:
+1. Create a RecordingStatusView component
+2. Implement a timer display showing elapsed recording time
+3. Add a simple animated waveform visualization (can be simplified in initial implementation)
+4. Connect the view to RecordingManager's isRecording state
+5. Add a stop recording button
+6. Ensure the status indicators are visible when recording is active
+

@@ -1,106 +1,136 @@
 import Foundation
 import AVFoundation
-import SwiftData
+import SwiftUI
 
-#if os(iOS)
-@Observable
-final class RecordingManager {
+// Recording status state
+enum RecordingState {
+    case idle
+    case recording
+    case paused
+    case finished
+}
+
+// Simple recording manager
+class RecordingManager: ObservableObject {
+    // Shared instance
     static let shared = RecordingManager()
     
-    private(set) var isRecording = false
-    private(set) var currentRecordingURL: URL?
+    // Published properties for UI binding
+    @Published var recordingState: RecordingState = .idle
+    @Published var currentRecordingId: UUID?
+    @Published var elapsedTime: TimeInterval = 0
+    
+    // Audio properties
     private var audioRecorder: AVAudioRecorder?
-    private var recordingStartTime: Date?
+    private var timer: Timer?
     
-    private init() {}
+    // Initialize manager
+    private init() {
+        #if os(iOS)
+        setupAudioSession()
+        #endif
+    }
     
-    func startRecording() async throws -> URL {
+    // Setup audio session for recording
+    #if os(iOS)
+    private func setupAudioSession() {
         let audioSession = AVAudioSession.sharedInstance()
-        
         do {
-            try await requestMicrophonePermission()
             try audioSession.setCategory(.playAndRecord, mode: .default)
             try audioSession.setActive(true)
-            
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let audioFilename = documentsPath.appendingPathComponent("\(UUID().uuidString).m4a")
-            
-            let settings: [String: Any] = [
-                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                AVSampleRateKey: 44100.0,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderBitRateKey: 128000,
-                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-            ]
-            
+        } catch {
+            print("Failed to set up audio session: \(error.localizedDescription)")
+        }
+    }
+    #endif
+    
+    // Request microphone permissions
+    func requestPermissions(completion: @escaping (Bool) -> Void) {
+        #if os(iOS)
+        AVAudioApplication.requestRecordPermission { granted in
+            completion(granted)
+        }
+        #else
+        // For macOS - would need different approach
+        completion(false)
+        #endif
+    }
+    
+    // Start recording with a service type
+    func startRecording(serviceType: String) {
+        // Create a new recording ID
+        let recordingId = UUID()
+        self.currentRecordingId = recordingId
+        
+        // Set up recording file URL in documents directory
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let audioFilename = documentsDirectory.appendingPathComponent("\(recordingId.uuidString).m4a")
+        
+        // Configure audio recording settings
+        let settings = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 44100,
+            AVNumberOfChannelsKey: 2,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        
+        // Start recording
+        do {
             audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
             audioRecorder?.record()
             
-            isRecording = true
-            currentRecordingURL = audioFilename
-            recordingStartTime = Date()
+            // Start timer to track elapsed time
+            startTimer()
             
-            return audioFilename
+            // Update state
+            recordingState = .recording
         } catch {
-            throw RecordingError.recordingFailed(error)
+            print("Could not start recording: \(error.localizedDescription)")
         }
     }
     
-    func stopRecording() throws {
-        guard isRecording else { return }
-        
+    // Pause recording
+    func pauseRecording() {
+        audioRecorder?.pause()
+        timer?.invalidate()
+        recordingState = .paused
+    }
+    
+    // Resume recording
+    func resumeRecording() {
+        audioRecorder?.record()
+        startTimer()
+        recordingState = .recording
+    }
+    
+    // Stop recording
+    func stopRecording() {
         audioRecorder?.stop()
-        isRecording = false
-        
-        do {
-            try AVAudioSession.sharedInstance().setActive(false)
-        } catch {
-            throw RecordingError.recordingFailed(error)
-        }
+        timer?.invalidate()
+        timer = nil
+        recordingState = .finished
     }
     
-    func deleteRecording() {
-        guard let url = currentRecordingURL else { return }
-        
-        try? FileManager.default.removeItem(at: url)
-        currentRecordingURL = nil
-    }
-    
-    private func requestMicrophonePermission() async throws {
-        let status = AVAudioApplication.shared.recordPermission
-        
-        switch status {
-        case .granted:
-            return
-        case .denied:
-            throw RecordingError.permissionDenied
-        case .undetermined:
-            return try await withCheckedThrowingContinuation { continuation in
-                AVAudioApplication.requestRecordPermission { granted in
-                    if granted {
-                        continuation.resume()
-                    } else {
-                        continuation.resume(throwing: RecordingError.permissionDenied)
-                    }
-                }
+    // Start timer for tracking elapsed time
+    private func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            if let recorder = self.audioRecorder, recorder.isRecording {
+                self.elapsedTime = recorder.currentTime
             }
-        @unknown default:
-            throw RecordingError.permissionDenied
         }
     }
-}
-
-enum RecordingError: LocalizedError {
-    case permissionDenied
-    case recordingFailed(Error)
     
-    var errorDescription: String? {
-        switch self {
-        case .permissionDenied:
-            return "Microphone access is required to record audio. Please enable it in Settings."
-        case .recordingFailed(let error):
-            return "Failed to record audio: \(error.localizedDescription)"
-        }
+    // Reset for a new recording session
+    func reset() {
+        stopRecording()
+        elapsedTime = 0
+        recordingState = .idle
+        currentRecordingId = nil
     }
-}
-#endif 
+    
+    deinit {
+        audioRecorder?.stop()
+        timer?.invalidate()
+    }
+} 

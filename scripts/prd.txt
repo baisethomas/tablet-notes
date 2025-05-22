@@ -21,8 +21,17 @@
 
 ### 2. Notes During Recording
 - **Real-time Note-taking**: Users can type notes immediately while recording is in progress
-- **Split-screen Experience**: Recording status at top, note-taking area below
+- **Dual-pane Interface**: 
+  - Top pane: Live audio waveform with timer and basic controls
+  - Bottom pane: Note-taking area (fully editable)
 - **Auto-save**: Notes are saved continuously as user types
+- **Timestamped Notes**: Automatically timestamps notes (when Enter is pressed or after a pause)
+- **Rich Note Actions**:
+  - Highlighting: Marks important text with color and saves timestamp
+  - Bookmarking: Adds markers to specific moments in the recording
+  - Scripture Tagging: Quick entry for linking Bible references
+- **Floating Action Buttons**: Quick access to note-taking features
+- **Data Structure**: Each note block includes timestamp, text, tags, and scripture references
 - **Post-recording**: Notes are preserved and associated with the transcription for a complete record
 
 ### 3. AI Summarization

@@ -125,4 +125,13 @@ class AuthService: ObservableObject {
     func getCurrentUser() -> User? {
         return currentUser
     }
+    
+    /// Signs in with a test account (for development purposes only)
+    func signInWithTestAccount() {
+        // Simply set authentication state without creating a real User object
+        self.isAuthenticated = true
+        
+        // Note: currentUser will be nil, but the app will proceed to the main interface
+        // Only use this for development testing
+    }
 } 

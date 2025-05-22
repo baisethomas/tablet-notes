@@ -6,5 +6,7 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>TabletNotes needs microphone access to record sermons for transcription and note-taking.</string>
 </dict>
 </plist>

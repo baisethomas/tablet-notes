@@ -30,8 +30,9 @@ struct HomeView: View {
                     onHomeTap: {
                         // Implement home navigation
                     },
-                    onRecordTap: {
-                        // Implement recording
+                    onRecordTap: { serviceType in
+                        print("Starting recording for: \(serviceType.rawValue)")
+                        // We'll implement the actual recording later
                     },
                     onAccountTap: {
                         // Implement account navigation

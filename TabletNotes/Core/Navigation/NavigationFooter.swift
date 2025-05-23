@@ -2,8 +2,13 @@ import SwiftUI
 
 struct NavigationFooter: View {
     var onHomeTap: () -> Void = {}
-    var onRecordTap: () -> Void = {}
+    var onRecordTap: (ServiceType) -> Void = { _ in }
     var onAccountTap: () -> Void = {}
+    
+    @State private var showServiceTypeSelection = false
+    @State private var selectedServiceType: ServiceType?
+    @State private var showRecordingView = false
+    @State private var isRecording = false
     
     var body: some View {
         HStack {
@@ -11,18 +16,33 @@ struct NavigationFooter: View {
                 .frame(maxWidth: .infinity)
             
             // Center Record Button
-            Button(action: onRecordTap) {
-                Circle()
+            Button(action: {
+                if isRecording {
+                    showRecordingView = true
+                } else {
+                    showServiceTypeSelection = true
+                }
+            }) {
+                RoundedRectangle(cornerRadius: 20)
                     .fill(.blue)
                     .frame(width: 64, height: 64)
                     .overlay {
-                        Image(systemName: "microphone")
+                        Image(systemName: isRecording ? "waveform.circle" : "microphone")
                             .font(.title2)
                             .foregroundStyle(.white)
                     }
                     .offset(y: -20)
             }
             .frame(maxWidth: .infinity)
+            .confirmationDialog("Select Service Type", isPresented: $showServiceTypeSelection, titleVisibility: .visible) {
+                ForEach(ServiceType.allCases) { serviceType in
+                    Button(serviceType.rawValue) {
+                        selectedServiceType = serviceType
+                        showRecordingView = true
+                        isRecording = true
+                    }
+                }
+            }
             
             FooterButton(icon: "person", text: "Account", action: onAccountTap)
                 .frame(maxWidth: .infinity)
@@ -34,6 +54,11 @@ struct NavigationFooter: View {
                 .fill(.background)
                 .shadow(color: .black.opacity(0.1), radius: 3, y: -1)
                 .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showRecordingView) {
+            if let serviceType = selectedServiceType {
+                RecordingView(serviceType: serviceType)
+            }
         }
     }
 }
@@ -59,6 +84,10 @@ private struct FooterButton: View {
 #Preview {
     VStack {
         Spacer()
-        NavigationFooter()
+        NavigationFooter(
+            onHomeTap: {},
+            onRecordTap: { _ in },
+            onAccountTap: {}
+        )
     }
 } 

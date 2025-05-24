@@ -140,6 +140,7 @@ private struct NotesContentView: View {
 #Preview {
     // Sample data for preview
     let sermon = SermonDetailsModel(
+        id: UUID(),
         title: "Message Title",
         date: Date(),
         duration: 45 * 60, // 45 minutes
@@ -147,10 +148,12 @@ private struct NotesContentView: View {
         serviceType: .sermon,
         summary: "This is a sample summary of the sermon...",
         transcript: "This is a sample transcript of the sermon...",
-        notes: "These are sample notes for the sermon..."
+        notes: "These are sample notes for the sermon...",
+        createdAt: .now,
+        updatedAt: .now
     )
     
-    return NavigationStack {
+    NavigationStack {
         SermonDetailsView(sermon: sermon)
     }
 } 

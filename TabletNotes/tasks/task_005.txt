@@ -1,0 +1,131 @@
+# Task ID: 5
+# Title: Implement Scripture Detection and Bible Reference API Integration
+# Status: pending
+# Dependencies: 4
+# Priority: medium
+# Description: Create the scripture detection system that identifies Bible references in transcriptions and integrates with the Bible Reference API to provide contextual information and related passages.
+# Details:
+1. Create BibleReferenceService to interact with Bible Reference API
+2. Implement regex patterns to detect common Bible verse formats in transcriptions
+3. Create UI components to display scripture references with contextual information
+4. Implement tappable verse references that expand to show full context
+5. Add related passages functionality for paid tier users
+6. Cache scripture data for offline access
+7. Implement error handling for API failures
+
+Code example for Scripture Detection and Reference Service:
+```swift
+class BibleReferenceService {
+    private let apiBaseURL = "https://bible-api.com" // Example API
+    
+    // Regex patterns for common Bible verse formats
+    private let versePatterns = [
+        "(Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|1 Samuel|2 Samuel|1 Kings|2 Kings|1 Chronicles|2 Chronicles|Ezra|Nehemiah|Esther|Job|Psalm|Psalms|Proverbs|Ecclesiastes|Song of Solomon|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|Zechariah|Malachi|Matthew|Mark|Luke|John|Acts|Romans|1 Corinthians|2 Corinthians|Galatians|Ephesians|Philippians|Colossians|1 Thessalonians|2 Thessalonians|1 Timothy|2 Timothy|Titus|Philemon|Hebrews|James|1 Peter|2 Peter|1 John|2 John|3 John|Jude|Revelation)\s+(\d+):(\d+)(?:-(\d+))?"
+n    ]
+    
+    func detectScriptureReferences(in text: String) -> [ScriptureReference] {
+        var references = [ScriptureReference]()
+        
+        for pattern in versePatterns {
+            let regex = try? NSRegularExpression(pattern: pattern)
+            let nsString = text as NSString
+            let matches = regex?.matches(in: text, range: NSRange(location: 0, length: nsString.length)) ?? []
+            
+            for match in matches {
+                let book = nsString.substring(with: match.range(at: 1))
+                let chapter = nsString.substring(with: match.range(at: 2))
+                let verseStart = nsString.substring(with: match.range(at: 3))
+                let verseEnd = match.range(at: 4).location != NSNotFound ? nsString.substring(with: match.range(at: 4)) : nil
+                
+                let reference = ScriptureReference(
+                    book: book,
+                    chapter: Int(chapter) ?? 0,
+                    verseStart: Int(verseStart) ?? 0,
+                    verseEnd: verseEnd != nil ? Int(verseEnd!) : nil,
+                    textRange: match.range
+                )
+                
+                references.append(reference)
+            }
+        }
+        
+        return references
+    }
+    
+    func fetchVerseContent(for reference: ScriptureReference) async throws -> ScriptureContent {
+        var urlString = "\(apiBaseURL)/\(reference.book)+\(reference.chapter):\(reference.verseStart)"
+        
+        if let verseEnd = reference.verseEnd {
+            urlString += "-\(verseEnd)"
+        }
+        
+        guard let url = URL(string: urlString) else {
+            throw NSError(domain: "BibleReferenceError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+        }
+        
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NSError(domain: "BibleReferenceError", code: 2, userInfo: [NSLocalizedDescriptionKey: "API request failed"])
+        }
+        
+        return try JSONDecoder().decode(ScriptureContent.self, from: data)
+    }
+    
+    func fetchRelatedPassages(for reference: ScriptureReference) async throws -> [RelatedPassage] {
+        // This would connect to a more advanced Bible API that provides related passages
+        // For MVP, we could use a simpler approach or pre-defined relationships
+        
+        // Example implementation
+        let urlString = "\(apiBaseURL)/related/\(reference.book)/\(reference.chapter)/\(reference.verseStart)"
+        guard let url = URL(string: urlString) else {
+            throw NSError(domain: "BibleReferenceError", code: 3, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+        }
+        
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NSError(domain: "BibleReferenceError", code: 4, userInfo: [NSLocalizedDescriptionKey: "API request failed"])
+        }
+        
+        return try JSONDecoder().decode([RelatedPassage].self, from: data)
+    }
+}
+
+struct ScriptureReference {
+    let book: String
+    let chapter: Int
+    let verseStart: Int
+    let verseEnd: Int?
+    let textRange: NSRange
+    
+    var displayString: String {
+        if let verseEnd = verseEnd {
+            return "\(book) \(chapter):\(verseStart)-\(verseEnd)"
+        } else {
+            return "\(book) \(chapter):\(verseStart)"
+        }
+    }
+}
+
+struct ScriptureContent: Decodable {
+    let reference: String
+    let text: String
+    let translation: String
+    let context: String?
+}
+
+struct RelatedPassage: Decodable {
+    let reference: String
+    let text: String
+    let relationship: String // e.g., "parallel", "commentary", "cross-reference"
+}
+```
+
+# Test Strategy:
+1. Test scripture detection with various verse formats
+2. Verify Bible Reference API integration with mock responses
+3. Test UI components for displaying scripture references
+4. Verify contextual information display
+5. Test related passages functionality for paid tier users
+6. Verify offline caching of scripture data
+7. Test error handling for API failures
+8. Verify performance with large transcriptions containing many references

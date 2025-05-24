@@ -1,0 +1,278 @@
+# Task ID: 3
+# Title: Develop Real-time Note-taking Interface
+# Status: in-progress
+# Dependencies: 2
+# Priority: high
+# Description: Create the dual-pane note-taking interface that allows users to type notes while recording is in progress, with continuous auto-save functionality, timestamping, and rich note actions.
+# Details:
+1. Implement dual-pane UI with:
+   - Top pane: Live audio waveform with timer and basic controls
+   - Bottom pane: Note-taking area (fully editable)
+2. Implement TextEditor with styling for note input
+3. Create auto-save functionality that persists notes as user types
+4. Implement note association with current recording session
+5. Add keyboard handling and text formatting options
+6. Create NotesViewModel to manage note state and persistence
+7. Implement offline support for notes
+8. Add timestamping functionality that marks notes when Enter is pressed or after a short pause
+9. Implement rich note actions:
+   - Highlighting text with color (saving timestamp)
+   - Bookmarking important moments in the recording
+   - Scripture tagging with quick entry box
+10. Create enhanced data structure for notes including timestamp, text content, tags, and scripture references
+11. Add floating action buttons (FABs) near the note panel for quick access to features
+
+Code example for NotesView:
+```swift
+struct NotesView: View {
+    @ObservedObject var viewModel: NotesViewModel
+    @EnvironmentObject var recordingManager: RecordingManager
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Top pane: Recording status with waveform and controls
+            if recordingManager.isRecording {
+                RecordingStatusView(duration: viewModel.elapsedTime)
+                    .frame(height: 100)
+                    .background(Color.red.opacity(0.1))
+            }
+            
+            // Bottom pane: Note taking area
+            ZStack(alignment: .bottomTrailing) {
+                TextEditor(text: $viewModel.noteText)
+                    .padding()
+                    .onChange(of: viewModel.noteText) { newValue in
+                        viewModel.checkForTimestamp(newText: newValue)
+                        viewModel.saveNote()
+                    }
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            // Text formatting buttons
+                            Button(action: { viewModel.formatBold() }) {
+                                Image(systemName: "bold")
+                            }
+                            Button(action: { viewModel.formatItalic() }) {
+                                Image(systemName: "italic")
+                            }
+                            Button(action: { viewModel.addHighlight() }) {
+                                Image(systemName: "highlighter")
+                            }
+                            Button(action: { viewModel.addBookmark() }) {
+                                Image(systemName: "bookmark")
+                            }
+                            Button(action: { viewModel.showScriptureTagging() }) {
+                                Image(systemName: "book")
+                            }
+                            Spacer()
+                        }
+                    }
+                
+                // Floating Action Buttons
+                VStack(spacing: 12) {
+                    FloatingActionButton(icon: "highlighter") {
+                        viewModel.addHighlight()
+                    }
+                    FloatingActionButton(icon: "bookmark") {
+                        viewModel.addBookmark()
+                    }
+                    FloatingActionButton(icon: "book") {
+                        viewModel.showScriptureTagging()
+                    }
+                }
+                .padding()                
+            }
+        }
+        .onAppear {
+            viewModel.loadExistingNotes(for: recordingManager.currentRecording)
+        }
+        .sheet(isPresented: $viewModel.showingScriptureSheet) {
+            ScriptureTaggingView(onSave: { reference in
+                viewModel.addScriptureReference(reference)
+            })
+        }
+    }
+}
+
+struct FloatingActionButton: View {
+    let icon: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .foregroundColor(.white)
+                .padding(12)
+                .background(Circle().fill(Color.blue))
+                .shadow(radius: 2)
+        }
+    }
+}
+
+struct Note: Identifiable, Codable {
+    var id = UUID()
+    var content: String
+    var sermonId: UUID
+    var timestamps: [NoteTimestamp] = []
+    var highlights: [TextHighlight] = []
+    var bookmarks: [Bookmark] = []
+    var scriptureReferences: [ScriptureReference] = []
+}
+
+struct NoteTimestamp: Identifiable, Codable {
+    var id = UUID()
+    var time: TimeInterval
+    var text: String
+}
+
+struct TextHighlight: Identifiable, Codable {
+    var id = UUID()
+    var range: Range<String.Index>
+    var color: String
+    var timestamp: TimeInterval
+}
+
+struct Bookmark: Identifiable, Codable {
+    var id = UUID()
+    var timestamp: TimeInterval
+    var label: String
+}
+
+struct ScriptureReference: Identifiable, Codable {
+    var id = UUID()
+    var book: String
+    var chapter: Int
+    var verse: String
+    var timestamp: TimeInterval
+}
+
+class NotesViewModel: ObservableObject {
+    @Published var noteText = ""
+    @Published var elapsedTime: TimeInterval = 0
+    @Published var showingScriptureSheet = false
+    private var timer: Timer?
+    private var currentRecording: SermonRecording?
+    private var modelContext: ModelContext
+    private var lastTypingTimestamp: Date?
+    private var typingPauseTimer: Timer?
+    
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+        startTimer()
+    }
+    
+    func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.elapsedTime += 1.0
+        }
+    }
+    
+    func loadExistingNotes(for recording: SermonRecording?) {
+        guard let recording = recording else { return }
+        self.currentRecording = recording
+        
+        if let existingNote = recording.notes?.first {
+            self.noteText = existingNote.content
+        }
+    }
+    
+    func checkForTimestamp(newText: String) {
+        // Check if Enter was pressed
+        if newText.contains("\n") && !noteText.contains("\n") {
+            addTimestamp()
+        }
+        
+        // Set up pause detection
+        lastTypingTimestamp = Date()
+        typingPauseTimer?.invalidate()
+        typingPauseTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+            self?.addTimestamp()
+        }
+    }
+    
+    func addTimestamp() {
+        guard let recording = currentRecording else { return }
+        
+        let timestamp = NoteTimestamp(time: elapsedTime, text: noteText)
+        
+        if var note = recording.notes?.first as? Note {
+            note.timestamps.append(timestamp)
+        }
+        
+        try? self.modelContext.save()
+    }
+    
+    func addHighlight() {
+        // Implementation for highlighting selected text
+        // and saving the timestamp
+    }
+    
+    func addBookmark() {
+        guard let recording = currentRecording else { return }
+        
+        let bookmark = Bookmark(timestamp: elapsedTime, label: "Bookmark at \(formatTime(elapsedTime))")
+        
+        if var note = recording.notes?.first as? Note {
+            note.bookmarks.append(bookmark)
+            try? self.modelContext.save()
+        }
+    }
+    
+    func showScriptureTagging() {
+        showingScriptureSheet = true
+    }
+    
+    func addScriptureReference(_ reference: ScriptureReference) {
+        guard let recording = currentRecording else { return }
+        
+        var scriptureRef = reference
+        scriptureRef.timestamp = elapsedTime
+        
+        if var note = recording.notes?.first as? Note {
+            note.scriptureReferences.append(scriptureRef)
+            try? self.modelContext.save()
+        }
+    }
+    
+    func saveNote() {
+        guard let recording = currentRecording else { return }
+        
+        // Debounce save operation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            
+            if let existingNote = recording.notes?.first as? Note {
+                existingNote.content = self.noteText
+            } else {
+                let newNote = Note(content: self.noteText, sermonId: recording.id)
+                recording.notes = [newNote]
+            }
+            
+            try? self.modelContext.save()
+        }
+    }
+    
+    private func formatTime(_ timeInterval: TimeInterval) -> String {
+        let minutes = Int(timeInterval) / 60
+        let seconds = Int(timeInterval) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+}
+```
+
+# Test Strategy:
+1. Test auto-save functionality with timed intervals
+2. Verify note persistence across app restarts
+3. Test keyboard handling and text formatting
+4. Verify dual-pane UI adapts to different device sizes
+5. Test performance with large notes (10,000+ characters)
+6. Verify offline note-taking works correctly
+7. Test note association with the correct recording
+8. Verify UI responsiveness during continuous typing
+9. Test timestamping functionality when Enter is pressed and after typing pauses
+10. Verify highlighting functionality preserves correct timestamps
+11. Test bookmark creation and retrieval
+12. Verify scripture tagging works correctly and saves with timestamps
+13. Test floating action buttons for accessibility and ease of use
+14. Verify audio recording continues uninterrupted during note-taking
+15. Test the complete user journey from recording start to note-taking
+16. Verify the data structure correctly stores all note components (timestamps, highlights, bookmarks, scripture references)

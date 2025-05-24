@@ -1,0 +1,130 @@
+# Product Requirements Document (PRD)
+
+## Product Name: Tablet
+
+### Overview
+**Tablet** is a mobile-first sermon note-taking app that uses AI to transcribe, summarize, and provide scriptural insights from sermons. It supports two user tiers (Free & Paid), allowing pastors, note-takers, and spiritual seekers to revisit sermon content meaningfully. It draws inspiration from Otter.ai, which is the primary competitor and influence for this product.
+
+## Core Features
+
+### 1. Audio Upload/Recording
+- **User Flow**: 
+  - Simplified: Open app → Tap record button → Select service type → Begin recording and taking notes immediately
+- **Service Types**: Sunday Service, Bible Study, Midweek, Conference, Guest Speaker
+- **UI Elements**:
+  - Prominent Button: "Record" (centrally located in tab bar)
+  - Quick Modal: Service Type selection appears after hitting record
+  - Visual Indicator: Recording in progress
+  - Immediate transition to note-taking interface
+- **Offline Support**: Users can record audio offline; recordings are uploaded when internet is available
+- **Audio Format**: AAC, 128kbps, 44.1kHz (industry standard; paid users may access 256kbps)
+
+### 2. Notes During Recording
+- **Real-time Note-taking**: Users can type notes immediately while recording is in progress
+- **Dual-pane Interface**: 
+  - Top pane: Live audio waveform with timer and basic controls
+  - Bottom pane: Note-taking area (fully editable)
+- **Auto-save**: Notes are saved continuously as user types
+- **Timestamped Notes**: Automatically timestamps notes (when Enter is pressed or after a pause)
+- **Rich Note Actions**:
+  - Highlighting: Marks important text with color and saves timestamp
+  - Bookmarking: Adds markers to specific moments in the recording
+  - Scripture Tagging: Quick entry for linking Bible references
+- **Floating Action Buttons**: Quick access to note-taking features
+- **Data Structure**: Each note block includes timestamp, text, tags, and scripture references
+- **Post-recording**: Notes are preserved and associated with the transcription for a complete record
+
+### 3. AI Summarization
+- **Processing**:
+  - Transcription and summarization via AssemblyAI (asynchronous API)
+  - No speaker diarization required
+  - Scripture detection (using Bible Reference API)
+- **Tier Behavior**:
+  - Free: High-level summary
+  - Paid: Deep summary + insights + preaching tone
+
+### 4. Scripture Insights
+- Uses Bible Reference API for:
+  - Auto-linking verses
+  - Contextual background info
+  - Related passages
+
+### 5. Notes + Export
+- Interactive note viewer
+- Download/export: PDF, Markdown
+- Copy/share with formatted structure
+
+### 6. User Account System
+- Auth via Supabase (email/password only for MVP)
+- Stripe billing integration
+- Roles: Free, Paid
+
+## Tech Stack
+- **Frontend**: iOS (SwiftUI)
+- **Backend**: Supabase
+- **AI**: AssemblyAI (asynchronous API for transcription and summarization)
+- **Scripture Data**: Bible Reference API
+- **Billing**: Stripe
+
+Technical Requirements:
+
+1. Platform & Framework
+- iOS native app using SwiftUI
+- SwiftData for local storage
+- AVFoundation for audio recording
+- OpenAI API for AI features
+- CloudKit for sync (future)
+
+2. Data Models
+- Sermon recordings
+- Notes
+- Transcriptions
+- User profiles
+- Service types
+
+3. Architecture
+- MVVM architecture
+- Clean separation of concerns
+- Modular design for future expansion
+- Offline-first approach
+- Robust error handling
+
+4. Performance Requirements
+- Fast app launch (under 2 seconds)
+- Smooth recording experience
+- Real-time note saving
+- Efficient search implementation
+- Minimal battery impact
+
+5. Security
+- Secure audio storage
+- Private note encryption
+- Safe API key handling
+- User data protection
+- GDPR compliance
+
+Development Phases:
+
+Phase 1 - Core Features
+- Basic recording functionality
+- Simple note-taking interface
+- Local storage implementation
+- Essential UI components
+
+Phase 2 - AI Integration
+- Transcription service setup
+- Summary generation
+- Scripture detection
+- Topic categorization
+
+Phase 3 - User Management
+- User profiles
+- Tier management
+- Usage tracking
+- Settings interface
+
+Phase 4 - Polish & Optimization
+- UI refinements
+- Performance optimization
+- Bug fixes
+- User feedback implementation 
